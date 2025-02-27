@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hari Jadi Istimewa!</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Selamat Hari Jadi, [Nama Rakan Anda]! 🎉</h1>
+        <p class="message">Semoga hari jadi ini dipenuhi dengan kebahagiaan, cinta, dan kenangan indah.</p>
+        
+        <!-- Gambar -->
+        <img src="birthday.jpg" alt="Hari Jadi" class="birthday-image">
+
+        <!-- Butang Interaktif -->
+        <button id="wishButton" onclick="showWishes()">Tekan Untuk Ucapan Istimewa</button>
+
+        <!-- Mesej Ucapan Tersembunyi -->
+        <div id="wishes" class="hidden">
+            <p>Terima kasih kerana menjadi sahabat yang hebat! ❤️</p>
+            <p>Semoga semua impianmu menjadi kenyataan tahun ini.</p>
+        </div>
+
+        <!-- Pemain Muzik -->
+        <audio id="backgroundMusic" loop>
+            <source src="happy-birthday-song.mp3" type="audio/mpeg">
+            Browser anda tidak menyokong elemen audio.
+        </audio>
+        <button id="musicButton" onclick="toggleMusic()">Mainkan Muzik 🎵</button>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
