@@ -474,4 +474,23 @@
       minTrackingConfidence: 0.7
     });
 
-    hands.onRes
+    hands.onResults(onResults);
+
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        await hands.send({ image: videoElement });
+      },
+      width: 1280,
+      height: 720
+    });
+
+    camera.start().then(() => {
+      statusInfo.innerText = "Kamera aktif! Tunjukkan tangan anda di skrin.";
+    }).catch(err => {
+      statusInfo.innerText = "Sila benarkan akses kamera untuk bermain.";
+    });
+
+    loadQuestion();
+  </script>
+</body>
+</html>
