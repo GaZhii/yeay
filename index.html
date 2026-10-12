@@ -1,36 +1,109 @@
 <!DOCTYPE html>
 <html lang="ms">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hari Jadi Istimewa!</title>
-    <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-    <div class="container">
-        <h1>Selamat Hari Jadi, [Nama Rakan Anda]! 🎉</h1>
-        <p class="message">Semoga hari jadi ini dipenuhi dengan kebahagiaan, cinta, dan kenangan indah.</p>
-        
-        <!-- Gambar -->
-        <img src="birthday.jpg" alt="Hari Jadi" class="birthday-image">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kuiz Santai: Syirazi & Yasmin</title>
+  
+  <!-- MediaPipe Hands & Camera Utils -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
-        <!-- Butang Interaktif -->
-        <button id="wishButton" onclick="showWishes()">Tekan Untuk Ucapan Istimewa</button>
+  <style>
+    :root {
+      --primary: #ec4899;
+      --primary-dark: #be185d;
+      --accent: #8b5cf6;
+      --gold: #f59e0b;
+      --bg: #0f172a;
+    }
 
-        <!-- Mesej Ucapan Tersembunyi -->
-        <div id="wishes" class="hidden">
-            <p>Terima kasih kerana menjadi sahabat yang hebat! ❤️</p>
-            <p>Semoga semua impianmu menjadi kenyataan tahun ini.</p>
-        </div>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
 
-        <!-- Pemain Muzik -->
-        <audio id="backgroundMusic" loop>
-            <source src="happy-birthday-song.mp3" type="audio/mpeg">
-            Browser anda tidak menyokong elemen audio.
-        </audio>
-        <button id="musicButton" onclick="toggleMusic()">Mainkan Muzik 🎵</button>
-    </div>
+    body {
+      background: var(--bg);
+      color: #fff;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
 
-    <script src="script.js"></script>
-</body>
-</html>
+    /* Video & Kanvas Kamera Latar */
+    #webcam { display: none; }
+    
+    #output_canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      transform: scaleX(-1); /* Cermin paparan */
+      z-index: 1;
+      opacity: 0.25;
+    }
+
+    /* Kursor Tangan Maya */
+    #hand-cursor {
+      position: absolute;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(236, 72, 153, 0.7);
+      border: 3px solid #fff;
+      box-shadow: 0 0 16px var(--primary);
+      pointer-events: none;
+      z-index: 1000;
+      transform: translate(-50%, -50%);
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    #hand-cursor.pinching {
+      background: rgba(16, 185, 129, 0.95);
+      box-shadow: 0 0 20px #10b981;
+      transform: translate(-50%, -50%) scale(0.75);
+    }
+
+    /* Antaramuka Utama */
+    #game-container {
+      position: relative;
+      z-index: 10;
+      width: 90%;
+      max-width: 850px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .header-box {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(10px);
+      padding: 18px 30px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      text-align: center;
+      width: 100%;
+    }
+
+    .header-box h1 {
+      font-size: 1.8rem;
+      color: #f472b6;
+      margin-bottom: 6px;
+    }
+
+    .guide {
+      font-size: 0.95rem;
+      color: #cbd5e1;
+    }
+
+    /*
