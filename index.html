@@ -106,4 +106,372 @@
       color: #cbd5e1;
     }
 
-    /*
+    /* Kad Soalan & Tempat Kosong */
+    .question-panel {
+      background: rgba(255, 255, 255, 0.95);
+      color: #1e293b;
+      padding: 30px;
+      border-radius: 20px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+    }
+
+    .question-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 25px;
+      color: #0f172a;
+    }
+
+    /* Tempat Letak Jawapan (Slot) */
+    .slot-wrapper {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 1.3rem;
+      font-weight: 600;
+    }
+
+    .drop-slot {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 140px;
+      height: 60px;
+      border: 3px dashed var(--primary);
+      border-radius: 14px;
+      background: rgba(236, 72, 153, 0.08);
+      color: var(--primary-dark);
+      font-weight: 800;
+      font-size: 1.4rem;
+      transition: all 0.2s ease;
+    }
+
+    .drop-slot.active-hover {
+      background: rgba(16, 185, 129, 0.2);
+      border-color: #10b981;
+      transform: scale(1.08);
+    }
+
+    /* Pilihan Jawapan Boleh Diseret */
+    .cards-palette {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .drag-chip {
+      width: 130px;
+      height: 60px;
+      background: linear-gradient(135deg, var(--accent), var(--primary));
+      color: #fff;
+      font-size: 1.3rem;
+      font-weight: 800;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 20px rgba(236, 72, 153, 0.4);
+      user-select: none;
+      cursor: grab;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      transition: transform 0.1s ease;
+    }
+
+    .drag-chip.is-dragging {
+      position: fixed;
+      pointer-events: none;
+      z-index: 2000;
+      box-shadow: 0 15px 30px rgba(0, 0, 0, 0.5);
+      transform: translate(-50%, -50%) scale(1.15);
+    }
+
+    /* Bar Status */
+    #status-info {
+      position: absolute;
+      bottom: 25px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      padding: 10px 24px;
+      border-radius: 30px;
+      font-size: 0.95rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      z-index: 20;
+    }
+  </style>
+</head>
+<body>
+
+  <video id="webcam" playsinline></video>
+  <canvas id="output_canvas"></canvas>
+
+  <!-- Kursor Gestur Tangan Maya -->
+  <div id="hand-cursor"></div>
+
+  <!-- Bekas Permainan -->
+  <div id="game-container">
+    <div class="header-box">
+      <h1>✨ Kuiz Interaktif Syirazi & Yasmin ✨</h1>
+      <p class="guide">
+        👌 <b>Cubit (temukan jari telunjuk & ibu jari)</b> pada kad jawapan untuk pegang, bawa ke petak bertitik, dan <b>buka jari</b> untuk lepaskan!
+      </p>
+    </div>
+
+    <div class="question-panel" id="quiz-card">
+      <div class="question-title" id="question-text">Memuatkan...</div>
+
+      <div class="slot-wrapper">
+        <span>Jawapan:</span>
+        <div class="drop-slot" id="target-slot">Letak Sini</div>
+      </div>
+    </div>
+
+    <!-- Pilihan Kad Jawapan -->
+    <div class="cards-palette" id="palette">
+      <!-- Kad akan dijana oleh JS -->
+    </div>
+  </div>
+
+  <div id="status-info">Memulakan kamera & pengecaman gestur tangan...</div>
+
+  <script>
+    // Audio Sintesis Mudah (Web Audio API)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playBeep(freq, type = 'sine', duration = 0.15) {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+    }
+
+    // Senarai Soalan Mengikut Permintaan Pengguna
+    const quizData = [
+      {
+        question: "1. Adakah Syirazi Hensem?",
+        correct: "Ya",
+        choices: ["Ya", "Bukan"]
+      },
+      {
+        question: "2. Adakah Yasmin busuk?",
+        correct: "Ya",
+        choices: ["Ya", "Wangi"]
+      },
+      {
+        question: "3. Syirazi sayang Yasmin ke tak?",
+        correct: "Ya",
+        choices: ["Ya", "Tak Sayang"]
+      }
+    ];
+
+    let currentQ = 0;
+    let draggedChip = null;
+    let isPinching = false;
+    let lastPinchState = false;
+
+    const handCursor = document.getElementById('hand-cursor');
+    const targetSlot = document.getElementById('target-slot');
+    const questionText = document.getElementById('question-text');
+    const palette = document.getElementById('palette');
+    const statusInfo = document.getElementById('status-info');
+
+    function loadQuestion() {
+      const q = quizData[currentQ];
+      questionText.innerText = q.question;
+      targetSlot.innerText = "Letak Sini";
+      targetSlot.classList.remove('active-hover');
+      targetSlot.style.borderColor = 'var(--primary)';
+      targetSlot.style.background = 'rgba(236, 72, 153, 0.08)';
+
+      palette.innerHTML = '';
+      q.choices.forEach(choice => {
+        const chip = document.createElement('div');
+        chip.className = 'drag-chip';
+        chip.innerText = choice;
+        chip.dataset.val = choice;
+        palette.appendChild(chip);
+      });
+    }
+
+    function handleHandMovement(cursorX, cursorY, pinching) {
+      handCursor.style.left = `${cursorX}px`;
+      handCursor.style.top = `${cursorY}px`;
+
+      if (pinching) {
+        handCursor.classList.add('pinching');
+      } else {
+        handCursor.classList.remove('pinching');
+      }
+
+      // 1. Mula mencubit (Grab event)
+      if (pinching && !lastPinchState) {
+        const chips = document.querySelectorAll('.drag-chip');
+        chips.forEach(chip => {
+          const rect = chip.getBoundingClientRect();
+          if (
+            cursorX >= rect.left && cursorX <= rect.right &&
+            cursorY >= rect.top && cursorY <= rect.bottom
+          ) {
+            draggedChip = chip;
+            draggedChip.classList.add('is-dragging');
+            playBeep(440, 'triangle', 0.1); // Bunyi angkat kad
+          }
+        });
+      }
+
+      // 2. Sedang mengheret kad (Dragging)
+      if (draggedChip && pinching) {
+        draggedChip.style.left = `${cursorX}px`;
+        draggedChip.style.top = `${cursorY}px`;
+
+        // Semak jika berada di atas tempat letak jawapan
+        const slotRect = targetSlot.getBoundingClientRect();
+        if (
+          cursorX >= slotRect.left && cursorX <= slotRect.right &&
+          cursorY >= slotRect.top && cursorY <= slotRect.bottom
+        ) {
+          targetSlot.classList.add('active-hover');
+        } else {
+          targetSlot.classList.remove('active-hover');
+        }
+      }
+
+      // 3. Lepaskan cubitan (Drop event)
+      if (!pinching && lastPinchState && draggedChip) {
+        const slotRect = targetSlot.getBoundingClientRect();
+        const droppedInSlot = (
+          cursorX >= slotRect.left && cursorX <= slotRect.right &&
+          cursorY >= slotRect.top && cursorY <= slotRect.bottom
+        );
+
+        if (droppedInSlot) {
+          checkAnswer(draggedChip.dataset.val);
+        } else {
+          // Batal seret jika terlepas di luar slot
+          resetDraggedChip();
+        }
+      }
+
+      lastPinchState = pinching;
+    }
+
+    function resetDraggedChip() {
+      if (draggedChip) {
+        draggedChip.classList.remove('is-dragging');
+        draggedChip.style.left = '';
+        draggedChip.style.top = '';
+        draggedChip = null;
+      }
+    }
+
+    function checkAnswer(chosenVal) {
+      const q = quizData[currentQ];
+      if (chosenVal === q.correct) {
+        targetSlot.innerText = chosenVal;
+        targetSlot.style.borderColor = '#10b981';
+        targetSlot.style.background = '#d1fae5';
+        targetSlot.style.color = '#065f46';
+        playBeep(659, 'sine', 0.25); // Bunyi betul
+
+        statusInfo.innerText = "🎉 Betul sekali! Bersedia untuk soalan seterusnya...";
+        resetDraggedChip();
+
+        currentQ++;
+        setTimeout(() => {
+          if (currentQ < quizData.length) {
+            loadQuestion();
+            statusInfo.innerText = "Cubit kad pilihan anda dan seret ke tempat kosong!";
+          } else {
+            showEndScreen();
+          }
+        }, 1300);
+      } else {
+        playBeep(220, 'sawtooth', 0.3); // Bunyi salah
+        statusInfo.innerText = "❌ Alamak! Bukan itu jawapannya. Cuba lagi!";
+        resetDraggedChip();
+      }
+    }
+
+    function showEndScreen() {
+      const container = document.getElementById('game-container');
+      container.innerHTML = `
+        <div class="header-box" style="padding: 50px;">
+          <h1 style="font-size: 2.4rem; color: #f472b6; margin-bottom: 20px;">❤️ Kuiz Lengkap! ❤️</h1>
+          <p style="font-size: 1.3rem; line-height: 1.8; color: #f8fafc;">
+            Semua jawapannya disahkan <b>"YA"</b> sebulat suara!<br>
+            Syirazi hensem, Yasmin busuk, dan Syirazi sayang Yasmin! 😂🥰
+          </p>
+          <button onclick="location.reload()" style="margin-top: 30px; padding: 14px 32px; background: var(--primary); color: white; border: none; border-radius: 14px; font-weight: bold; cursor: pointer; font-size: 1.1rem; box-shadow: 0 8px 20px rgba(236,72,153,0.4);">
+            Main Semula
+          </button>
+        </div>
+      `;
+      handCursor.style.display = 'none';
+      statusInfo.innerText = "Permainan tamat dengan penuh kasih sayang!";
+    }
+
+    // Integrasi MediaPipe Hands
+    const videoElement = document.getElementById('webcam');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+
+    function onResults(results) {
+      canvasElement.width = window.innerWidth;
+      canvasElement.height = window.innerHeight;
+
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const landmarks = results.multiHandLandmarks[0];
+
+        // Titik 8: Jari Telunjuk, Titik 4: Ibu Jari
+        const indexTip = landmarks[8];
+        const thumbTip = landmarks[4];
+
+        // Kira posisi skrin (dicerminkan horizontal)
+        const indexX = (1 - indexTip.x) * window.innerWidth;
+        const indexY = indexTip.y * window.innerHeight;
+
+        const thumbX = (1 - thumbTip.x) * window.innerWidth;
+        const thumbY = thumbTip.y * window.innerHeight;
+
+        // Titik tengah antara jari telunjuk dan ibu jari
+        const midX = (indexX + thumbX) / 2;
+        const midY = (indexY + thumbY) / 2;
+
+        // Jarak antara telunjuk & ibu jari untuk kesan "cubitan" (pinch)
+        const distance = Math.hypot(indexX - thumbX, indexY - thumbY);
+        const pinching = distance < 55; // Ambang jarak cubitan (pixel)
+
+        handCursor.style.display = 'block';
+        handleHandMovement(midX, midY, pinching);
+      } else {
+        handCursor.style.display = 'none';
+        if (draggedChip) resetDraggedChip();
+      }
+      canvasCtx.restore();
+    }
+
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+    });
+
+    hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.7,
+      minTrackingConfidence: 0.7
+    });
+
+    hands.onRes
